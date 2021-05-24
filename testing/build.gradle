@@ -1,0 +1,36 @@
+import com.solarmc.eclipse.util.lunar.Version
+
+buildscript {
+    repositories {
+        maven {
+            url = "https://plugins.gradle.org/m2/"
+        }
+        maven {
+            url = "https://maven.quiltmc.org/"
+        }
+        maven {
+            url = "https://maven.fabricmc.net/"
+        }
+        maven {
+            url = "https://jitpack.io"
+        }
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath("com.solarmc:eclipse")
+    }
+}
+
+plugins {
+    id("java")
+}
+
+apply plugin: "com.solarmc.eclipse"
+
+group = "com.solarmc"
+version = "1.0-SNAPSHOT"
+
+solarEclipse {
+    version = Version.v1_16
+}
