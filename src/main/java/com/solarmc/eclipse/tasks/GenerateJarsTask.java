@@ -32,6 +32,7 @@ public class GenerateJarsTask extends DefaultTask {
         this.minecraftProvider.retrieveFiles(vanillaMc);
 
         this.lunarProvider = new LunarProvider();
-        this.lunarProvider.retrieveUnmappedFiles(getProject(), extensionInfo, minecraftProvider);
+        this.lunarProvider.retrieveFiles(getProject(), extensionInfo, minecraftProvider);
+        this.lunarProvider.retrieveIntermediaryDependantFiles(getProject(), extensionInfo, minecraftProvider);
     }
 }

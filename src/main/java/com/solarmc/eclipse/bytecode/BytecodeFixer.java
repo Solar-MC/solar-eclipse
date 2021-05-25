@@ -8,7 +8,6 @@ import org.objectweb.asm.ClassWriter;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.jar.JarEntry;
@@ -20,22 +19,6 @@ import java.util.jar.JarFile;
  * @author hydos
  */
 public class BytecodeFixer {
-
-    public static void fixLunarBytecode(Map<String, byte[]> classes, JarEntry entry, JarFile jar, SolarClassLoader classLoader) {
-        if (!entry.isDirectory()) {
-            if (entry.getName().endsWith(".class")) {
-                try (InputStream inputStream = jar.getInputStream(entry)) {
-                    byte[] bytecode = IOUtils.readFully(inputStream);
-                    bytecode = BytecodeFixer.fixBytecode(bytecode, classLoader);
-                    classes.put(entry.getName(), bytecode);
-                } catch (IOException e) {
-                    throw new RuntimeException("Failed to open InputStream for entry " + entry.getName(), e);
-                }
-            }
-        } else {
-            IOUtils.handleResource(classes, entry, jar);
-        }
-    }
 
     public static Map<String, byte[]> fixBytecode(Map<String, byte[]> classMap, SolarClassLoader classLoader) {
         Map<String, byte[]> fixedClassMap = new HashMap<>();
@@ -56,20 +39,26 @@ public class BytecodeFixer {
      * @return fixed bytecode
      */
     public static byte[] fixBytecode(byte[] originalBytecode, SolarClassLoader classLoader) {
-        if(originalBytecode == null) {
+        if (originalBytecode == null) {
             throw new RuntimeException("Tried to fix bytecode which doesnt exist!");
         }
-        ClassReader reader = new ClassReader(originalBytecode);
-        ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
-            @Override
-            protected ClassLoader getClassLoader() {
-                return classLoader;
-            }
-        };
-        ClassVisitor visitor = new BytecodeFixerVisitor(writer);
-        reader.accept(visitor, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        try {
+            ClassReader reader = new ClassReader(originalBytecode);
+            ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
+                @Override
+                protected ClassLoader getClassLoader() {
+                    return classLoader;
+                }
+            };
+            ClassVisitor visitor = new BytecodeFixerVisitor(writer);
+            reader.accept(visitor, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
 
-        return writer.toByteArray();
+            return writer.toByteArray();
+        } catch (IllegalArgumentException e) {
+            System.err.println("Failed to fix bytecode.");
+            e.printStackTrace();
+            return originalBytecode;
+        }
     }
 
     /**

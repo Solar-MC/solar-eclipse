@@ -307,4 +307,15 @@ public class IOUtils {
         ZipUtil.createEmpty(outFile.toFile());
         ZipUtil.addOrReplaceEntries(outFile.toFile(), entries);
     }
+
+    public static void appendToClassMap(Map<String,byte[]> lClassMap, JarEntry entry, JarFile lunarOfficialJar) {
+        if(entry.isDirectory()) {
+            return;
+        }
+        try {
+            lClassMap.put(entry.getName(), IOUtils.readFully(lunarOfficialJar.getInputStream(entry)));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to append " + entry.getRealName() + " to class map");
+        }
+    }
 }

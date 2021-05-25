@@ -36,6 +36,7 @@ public class LunarProvider {
 
     public LunarLaunchResponse launchResponse;
     public PatchInfo patchInfo;
+    public boolean lunarUpdated;
 
     public LunarProvider() throws IOException {
         URL url = new URL(LAUNCHER_URL);
@@ -55,7 +56,7 @@ public class LunarProvider {
         in.close();
     }
 
-    public void retrieveUnmappedFiles(Project project, EclipseGradleExtension extension, MinecraftProvider minecraftProvider) throws IOException {
+    public void retrieveFiles(Project project, EclipseGradleExtension extension, MinecraftProvider minecraftProvider) throws IOException {
         Logger logger = project.getLogger();
 
         File hashFile = GradleUtils.getCacheFile(project, extension, getLunarProdArtifact(launchResponse).sha1).toFile();
@@ -63,6 +64,8 @@ public class LunarProvider {
         System.out.println("===================");
 
         if (!hashFile.exists()) {
+            lunarUpdated = true;
+
             // If the hash doesnt exist this version of lunar must not already be downloaded.
             logger.info("Downloading Jars");
             for (LunarArtifact lunarArtifact : launchResponse.launchTypeData.artifacts) {
@@ -81,11 +84,15 @@ public class LunarProvider {
             Path lunarClassHashMappings = GradleUtils.getCacheFile(project, extension, "work/lunarClassHashMappings.tiny");
 
             Path lunarClassRemapped = GradleUtils.getCacheFile(project, extension, "work/lunar-prod-c-remapped.jar");
-            Path lunarOfficial = GradleUtils.getCacheFile(project, extension, "out/lunar-prod-official.jar");
-            Path lunarBytecodeFixed = GradleUtils.getCacheFile(project, extension, "work/lunar-prod-official-patched.jar");
+            Path lunarOfficial = GradleUtils.getCacheFile(project, extension, "work/lunar-prod-official.jar");
+            Path lunarBytecodeFixed = GradleUtils.getCacheFile(project, extension, "out/lunar-prod-official-patched.jar");
 
             if (!lunarClassRemapped.toFile().getParentFile().exists()) {
                 lunarClassRemapped.toFile().getParentFile().mkdirs();
+            }
+
+            if (!lunarBytecodeFixed.toFile().getParentFile().exists()) {
+                lunarBytecodeFixed.toFile().getParentFile().mkdirs();
             }
 
             logger.info("Loading Lunar Patches");
@@ -96,13 +103,13 @@ public class LunarProvider {
             System.out.println("===================");
 
             // Create the class mappings for mc
-            MappingSet lunarClassHashMappingSet = RemappingUtils.createAndWriteMappingSet(patchInfo.classMappings, lunarClassHashMappings, "named", "official");
+            RemappingUtils.createAndWriteMappingSet(patchInfo.classMappings, lunarClassHashMappings, "named", "official");
 
             // Setup the classpath & ClassLoader
             List<File> setupClasspath = extension.version.getDependencies(minecraftProvider);
             setupClasspath.add(lunarLibs.toFile());
             setupClasspath.add(lunarOfficial.toFile());
-            setupClasspath.add(minecraftPatched.toFile());
+            setupClasspath.add(minecraftPatchedUnClassHashed.toFile());
             SolarClassLoader setupClassLoader = SolarClassLoader.of(setupClasspath, patchInfo, lunarProd);
 
             // Patch Minecraft & Add Optifine along with it
@@ -123,21 +130,46 @@ public class LunarProvider {
 
             // Remap Lunar's Production jar to official
             RemappingUtils.remapJar(
-                    lunarClassHashMappingSet,
+                    lunarClassHashMappings,
                     "named",
                     "official",
                     lunarClassRemapped,
                     lunarOfficial
             );
 
+            // Remap Vanilla jar to official
+            RemappingUtils.remapJar(
+                    lunarClassHashMappings,
+                    "named",
+                    "official",
+                    minecraftPatched,
+                    minecraftPatchedUnClassHashed
+            );
+
             // Finish Patching Lunar's Production jar
             lClassMap.clear();
             JarFile lunarOfficialJar = new JarFile(lunarOfficial.toFile());
-            lunarOfficialJar.stream().forEach(entry -> IOUtils.lclassToClass(lClassMap, entry, lunarOfficialJar, setupClassLoader));
+            lunarOfficialJar.stream().forEach(entry -> IOUtils.appendToClassMap(lClassMap, entry, lunarOfficialJar));
             Map<String, byte[]> lunarClasses = BytecodeFixer.fixBytecode(lClassMap, setupClassLoader);
-            IOUtils.createJar(lunarClasses, lunarClassRemapped);
+            IOUtils.createJar(lunarClasses, lunarBytecodeFixed);
 
             hashFile.createNewFile();
+        }
+    }
+
+    public void retrieveIntermediaryDependantFiles(Project project, EclipseGradleExtension extension, MinecraftProvider minecraftProvider) throws IOException {
+        Path intermediary = GradleUtils.getCacheFile(project, extension, "intermediary.tiny");
+        Path lunarBytecodeFixed = GradleUtils.getCacheFile(project, extension, "out/lunar-prod-official-patched.jar");
+        Path lunarIntermediary = GradleUtils.getCacheFile(project, extension, "out/lunar-prod-intermediary.jar");
+
+        if(lunarUpdated || !lunarIntermediary.toFile().exists()) {
+            URL intermediaryUrl = new URL("https://raw.githubusercontent.com/Solar-MC/intermediary/master/" + getLunarProdArtifact(launchResponse).sha1 + ".tiny");
+
+            System.out.println("Downloading Intermediary Mappings");
+            IOUtils.downloadFile(intermediaryUrl, intermediary.toFile());
+
+            System.out.println("Generating Intermediary Lunar Production Jar");
+            RemappingUtils.remapJar(intermediary, "official", "intermediary", lunarBytecodeFixed, lunarIntermediary);
         }
     }
 
