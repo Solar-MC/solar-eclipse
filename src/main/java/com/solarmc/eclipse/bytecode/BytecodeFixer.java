@@ -56,6 +56,9 @@ public class BytecodeFixer {
      * @return fixed bytecode
      */
     public static byte[] fixBytecode(byte[] originalBytecode, SolarClassLoader classLoader) {
+        if(originalBytecode == null) {
+            throw new RuntimeException("Tried to fix bytecode which doesnt exist!");
+        }
         ClassReader reader = new ClassReader(originalBytecode);
         ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
             @Override

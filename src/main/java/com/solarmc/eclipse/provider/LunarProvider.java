@@ -79,9 +79,10 @@ public class LunarProvider {
             Path minecraftPatchedUnClassHashed = GradleUtils.getCacheFile(project, extension, "out/vanilla-patched-remapped.jar");
 
             Path lunarClassHashMappings = GradleUtils.getCacheFile(project, extension, "work/lunarClassHashMappings.tiny");
-            
+
             Path lunarClassRemapped = GradleUtils.getCacheFile(project, extension, "work/lunar-prod-c-remapped.jar");
-            Path lunarOfficial = GradleUtils.getCacheFile(project, extension, "out/lunar-official.jar");
+            Path lunarOfficial = GradleUtils.getCacheFile(project, extension, "out/lunar-prod-official.jar");
+            Path lunarBytecodeFixed = GradleUtils.getCacheFile(project, extension, "work/lunar-prod-official-patched.jar");
 
             if (!lunarClassRemapped.toFile().getParentFile().exists()) {
                 lunarClassRemapped.toFile().getParentFile().mkdirs();
@@ -91,7 +92,7 @@ public class LunarProvider {
             System.out.println("===================");
             this.patchInfo = new PatchInfo(extension.version, new JarFile(lunarProd.toFile()));
 
-            logger.info("Doing The Fun Stuff");
+            logger.info("Doing The Irritating Stuff");
             System.out.println("===================");
 
             // Create the class mappings for mc
@@ -100,8 +101,7 @@ public class LunarProvider {
             // Setup the classpath & ClassLoader
             List<File> setupClasspath = extension.version.getDependencies(minecraftProvider);
             setupClasspath.add(lunarLibs.toFile());
-            setupClasspath.add(lunarClassRemapped.toFile());
-            setupClasspath.add(vanilla.toFile());
+            setupClasspath.add(lunarOfficial.toFile());
             setupClasspath.add(minecraftPatched.toFile());
             SolarClassLoader setupClassLoader = SolarClassLoader.of(setupClasspath, patchInfo, lunarProd);
 
@@ -120,8 +120,6 @@ public class LunarProvider {
             JarFile lunarProdJar = new JarFile(lunarProd.toFile());
             lunarProdJar.stream().forEach(entry -> IOUtils.lclassToClass(lClassMap, entry, lunarProdJar, setupClassLoader));
             IOUtils.createJar(lClassMap, lunarClassRemapped);
-            Map<String, byte[]> lunarClasses = BytecodeFixer.fixBytecode(lClassMap, setupClassLoader);
-            IOUtils.createJar(lunarClasses, lunarClassRemapped);
 
             // Remap Lunar's Production jar to official
             RemappingUtils.remapJar(
@@ -132,14 +130,12 @@ public class LunarProvider {
                     lunarOfficial
             );
 
-            // Remap vanilla to official
-            RemappingUtils.remapJar(
-                    lunarClassHashMappingSet,
-                    "named",
-                    "official",
-                    minecraftPatched,
-                    minecraftPatchedUnClassHashed
-            );
+            // Finish Patching Lunar's Production jar
+            lClassMap.clear();
+            JarFile lunarOfficialJar = new JarFile(lunarOfficial.toFile());
+            lunarOfficialJar.stream().forEach(entry -> IOUtils.lclassToClass(lClassMap, entry, lunarOfficialJar, setupClassLoader));
+            Map<String, byte[]> lunarClasses = BytecodeFixer.fixBytecode(lClassMap, setupClassLoader);
+            IOUtils.createJar(lunarClasses, lunarClassRemapped);
 
             hashFile.createNewFile();
         }
@@ -157,21 +153,17 @@ public class LunarProvider {
     public static class LunarLaunchResponse {
         public boolean success;
         public LaunchTypeData launchTypeData;
-        public LaunchTypeData launch_type_data;
     }
 
     public static class LunarLaunchRequest {
         public String hwid = UUID.randomUUID().toString();
         public String os = "linux";
         public String arch = "x64";
-        public String launcher_version = "2.7.2";
+        public String launcher_version = "2.6.9";
         public String version = "1.16";
         public String branch = "master";
         public String launch_type = "OFFLINE";
         public String classifier = "optifine";
-
-        public LunarLaunchRequest() {
-        }
     }
 
     public static class LaunchTypeData {
