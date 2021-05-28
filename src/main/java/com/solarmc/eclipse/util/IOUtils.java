@@ -318,4 +318,17 @@ public class IOUtils {
             throw new RuntimeException("Failed to append " + entry.getRealName() + " to class map");
         }
     }
+
+    public static void appendPackageToClassMap(Map<String,byte[]> classMap, JarEntry entry, JarFile jarFile, String pkg) {
+        if(entry.isDirectory()) {
+            return;
+        }
+        try {
+            if(entry.getRealName().contains(pkg.replace(".", "/"))) {
+                classMap.put(entry.getName(), IOUtils.readFully(jarFile.getInputStream(entry)));
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to append " + entry.getRealName() + " to class map");
+        }
+    }
 }

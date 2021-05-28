@@ -8,7 +8,6 @@ import com.solarmc.eclipse.util.IOUtils;
 import com.solarmc.eclipse.util.RemappingUtils;
 import com.solarmc.eclipse.util.SolarClassLoader;
 import com.solarmc.eclipse.util.lunar.PatchInfo;
-import org.cadixdev.lorenz.MappingSet;
 import org.gradle.api.Project;
 import org.gradle.api.logging.Logger;
 
@@ -64,6 +63,7 @@ public class LunarProvider {
         System.out.println("===================");
 
         if (!hashFile.exists()) {
+            hashFile.getParentFile().delete();
             lunarUpdated = true;
 
             // If the hash doesnt exist this version of lunar must not already be downloaded.
@@ -161,8 +161,9 @@ public class LunarProvider {
         Path intermediary = GradleUtils.getCacheFile(project, extension, "intermediary.tiny");
         Path lunarBytecodeFixed = GradleUtils.getCacheFile(project, extension, "out/lunar-prod-official-patched.jar");
         Path lunarIntermediary = GradleUtils.getCacheFile(project, extension, "out/lunar-prod-intermediary.jar");
+        Path lunarIntermediaryStripped = GradleUtils.getCacheFile(project, extension, "out/lunar-prod-intermediary-stripped.jar");
 
-        if(lunarUpdated || !lunarIntermediary.toFile().exists()) {
+        if (lunarUpdated || !lunarIntermediary.toFile().exists()) {
             URL intermediaryUrl = new URL("https://raw.githubusercontent.com/Solar-MC/intermediary/master/" + getLunarProdArtifact(launchResponse).sha1 + ".tiny");
 
             System.out.println("Downloading Intermediary Mappings");
@@ -170,6 +171,13 @@ public class LunarProvider {
 
             System.out.println("Generating Intermediary Lunar Production Jar");
             RemappingUtils.remapJar(intermediary, "official", "intermediary", lunarBytecodeFixed, lunarIntermediary);
+
+            System.out.println("Removing Useless Packages for Mapping");
+            Map<String, byte[]> strippedClassMap = new HashMap<>();
+            JarFile lunarProdJar = new JarFile(lunarIntermediary.toFile());
+
+            lunarProdJar.stream().forEach(entry -> IOUtils.appendPackageToClassMap(strippedClassMap, entry, lunarProdJar, "com/lunar/"));
+            IOUtils.createJar(strippedClassMap, lunarIntermediaryStripped);
         }
     }
 

@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.solarmc"
-version = "1.0-SNAPSHOT"
+version = "1.2-SNAPSHOT"
 
 repositories {
     maven(url = "https://plugins.gradle.org/m2/")

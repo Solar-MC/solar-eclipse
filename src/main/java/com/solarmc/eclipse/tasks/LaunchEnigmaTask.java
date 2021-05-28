@@ -21,11 +21,11 @@ public class LaunchEnigmaTask extends DefaultTask {
     @TaskAction
     public void run() throws IOException {
         EclipseGradleExtension extension = GradleUtils.getExtension(getProject());
-        Path lunarIntermediary = GradleUtils.getCacheFile(getProject(), extension, "out/lunar-prod-intermediary.jar");
+        Path lunarIntermediaryStripped = GradleUtils.getCacheFile(getProject(), extension, "out/lunar-prod-intermediary-stripped.jar");
         File slapMappingsDir = new File(getProject().getProjectDir(), "mappings");
 
         Main.main(new String[]{
-                "-jar", lunarIntermediary.toString(),
+                "-jar", lunarIntermediaryStripped.toString(),
                 "-mappings", slapMappingsDir.toString()
         });
     }
